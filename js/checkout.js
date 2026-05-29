@@ -88,6 +88,7 @@
     } catch (e) {}
   })();
   function getUtms() { try { return JSON.parse(localStorage.getItem('vy_utm') || '{}'); } catch (e) { return {}; } }
+  function getCookie(n) { var m = document.cookie.match('(?:^|; )' + n + '=([^;]*)'); return m ? decodeURIComponent(m[1]) : undefined; }
 
   // ========================================================================
   function buildModal() {
@@ -425,6 +426,7 @@
     showAlert('');
     var data = lastPayload || collect();
     data.utm = getUtms(); // leva os UTMs do anúncio pra atribuição na UTMify
+    data.event_source_url = location.href; data.fbp = getCookie('_fbp'); data.fbc = getCookie('_fbc'); // p/ CAPI do Facebook no servidor
     var btn = $('[data-pay]');
     btn.disabled = true;
     var orig = btn.innerHTML;
@@ -453,6 +455,9 @@
     renderQR($('[data-qr]'), charge.qr_code, charge.qr_code_base64);
     $('[data-copia]').value = charge.qr_code || '';
     if (isTest) { $('[data-sim]').style.display = 'block'; $('[data-sandbox-tag]').style.display = 'block'; }
+    // Purchase no Facebook JÁ no PIX gerado (cliente está na tela → o Pixel dispara na hora).
+    // Live apenas; o CAPI do servidor é disparado em /api/checkout com o mesmo event_id (dedup).
+    if (!isTest) emit('vy:purchase', { chargeId: charge.id });
     startPolling();
   }
 
@@ -501,8 +506,8 @@
   function onPaid() {
     stopPolling(); stopCountdown();
     $('[data-order]').textContent = 'Pedido ' + friendlyOrder(currentOrderId);
-    // Purchase só em pagamento REAL (live) — sandbox não suja os dados do pixel
-    if (!isTest) emit('vy:purchase', { chargeId: currentChargeId, orderId: currentOrderId });
+    // Facebook Purchase já disparou no PIX gerado. Aqui só registra "venda paga" na UTMify.
+    emit('vy:paid', { chargeId: currentChargeId, orderId: currentOrderId });
     var eta = $('[data-done-eta]'); if (eta) eta.textContent = deliveryEstimate();
     setStep('done');
   }

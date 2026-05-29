@@ -55,15 +55,21 @@
     if (icFired) return; icFired = true; track('InitiateCheckout');
   });
 
-  // ---- Purchase: pagamento confirmado (Pixel + CAPI, deduplicados por event_id) ----
+  // ---- Purchase: disparado quando o PIX é GERADO (cliente na tela). ----
+  // Pixel no navegador aqui; o CAPI do servidor sai de /api/checkout com o mesmo
+  // event_id ('pur_'+id) → o Facebook deduplica e conta 1 Purchase.
   document.addEventListener('vy:purchase', function (e) {
     var id = (e.detail && e.detail.chargeId) || '';
-    var eventId = 'pur_' + id;
-    track('Purchase', { contents: [{ id: PRODUCT.content_ids[0], quantity: 1, item_price: PRODUCT.value }] }, eventId);
+    track('Purchase', { contents: [{ id: PRODUCT.content_ids[0], quantity: 1, item_price: PRODUCT.value }] }, 'pur_' + id);
+  });
+
+  // ---- Pago: registra "venda paga" na UTMify (backup do webhook). Sem Facebook (já disparou). ----
+  document.addEventListener('vy:paid', function (e) {
+    var id = (e.detail && e.detail.chargeId) || '';
     try {
       fetch('/api/track-purchase', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ charge_id: id, event_id: eventId, event_source_url: location.href, fbp: getCookie('_fbp'), fbc: getCookie('_fbc') }),
+        body: JSON.stringify({ charge_id: id, event_source_url: location.href }),
       });
     } catch (_) {}
   });
