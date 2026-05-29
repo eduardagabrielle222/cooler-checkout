@@ -1,0 +1,10 @@
+{
+  "name": "cooler-checkout-velory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Checkout PIX integrado à API Velory para a página do Cooler Trailmate 66L.",
+  "engines": {
+    "node": "22.x"
+  }
+}
