@@ -1,16 +1,46 @@
+import crypto from 'node:crypto';
 import { veloryFetch } from '../lib/velory.js';
-import { sendCapi } from '../lib/fb.js';
 import { notifyUtmifyPaid } from '../lib/utmify.js';
 
-// Recebe os webhooks da Velory. Em pagamento confirmado: notifica a UTMify (venda)
-// e dispara a Purchase na Conversions API (mesmo event_id 'pur_'+id → deduplicado
-// com o Pixel/navegador). Captura vendas mesmo se o cliente fechar a página.
-const CONTENT_ID = 'cooler-trailmate-66l';
-const CONTENT_NAME = 'Caixa Cooler Térmico Trailmate 66L';
+// Recebe os webhooks da Velory. Verifica a assinatura HMAC (soft) e, em pagamento
+// confirmado, registra a "venda paga" na UTMify. Captura a venda mesmo se o cliente
+// fechar a página. (O Facebook Purchase já dispara no PIX gerado, em /api/checkout.)
+
+// Precisamos do corpo BRUTO p/ validar a assinatura — desliga o parser da Vercel.
+export const config = { api: { bodyParser: false } };
+
+async function getRawBody(req) {
+  if (typeof req.rawBody === 'string') return req.rawBody;
+  if (Buffer.isBuffer(req.rawBody)) return req.rawBody.toString('utf8');
+  try {
+    const chunks = [];
+    for await (const c of req) chunks.push(typeof c === 'string' ? Buffer.from(c) : c);
+    return Buffer.concat(chunks).toString('utf8');
+  } catch { return ''; }
+}
+function validSignature(secret, raw, sigHeader) {
+  if (!secret || !raw || !sigHeader) return false;
+  const expected = crypto.createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
+  const got = String(sigHeader).replace(/^sha256=/i, '').trim().toLowerCase();
+  if (got.length !== expected.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(got, 'hex')); } catch { return false; }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).end(); }
-  const body = typeof req.body === 'string' ? safeParse(req.body) : (req.body || {});
+
+  const raw = await getRawBody(req);
+  const secret = process.env.VELORY_WEBHOOK_SECRET;
+  const sig = req.headers['x-velory-signature'];
+  // Verificação de assinatura é SOFT (só registra aviso, nunca derruba o webhook).
+  // A trava de segurança real é a confirmação do pagamento na API da Velory (abaixo):
+  // um webhook forjado com cobrança falsa nunca confirma como "paid" → nada dispara.
+  // Reliability-first: jamais perder uma venda por causa de assinatura.
+  if (secret && raw && !validSignature(secret, raw, sig)) {
+    console.warn('[webhook] assinatura não confere — seguindo (confirmação na API é a trava real)');
+  }
+
+  const body = raw ? safeParse(raw) : (req.body || {});
   const event = String(body.event || '');
   const d = body.data || {};
 
@@ -31,25 +61,8 @@ export default async function handler(req, res) {
 
     if (charge.status === 'paid') {
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || '0.0.0.0';
-
-      // UTMify: notifica a venda (sandbox → isTest)
+      // UTMify: "venda paga". O Facebook Purchase já disparou no PIX gerado (não repete).
       await notifyUtmifyPaid(charge, ip);
-
-      // Facebook CAPI: só em pagamento REAL (live)
-      if (charge.live_mode !== false) {
-        const cust = charge.customer || {};
-        const md = charge.metadata || {};
-        const value = (typeof charge.amount === 'number' ? charge.amount : 7990) / 100;
-        await sendCapi('Purchase', {
-          eventId: 'pur_' + id,
-          customer: { email: cust.email, phone: cust.phone, document: cust.document, name: cust.name, city: md.entrega_cidade, state: md.entrega_uf, zip: md.entrega_cep },
-          customData: {
-            value: value, currency: 'BRL',
-            content_ids: [CONTENT_ID], content_name: CONTENT_NAME, content_type: 'product',
-            contents: [{ id: CONTENT_ID, quantity: 1, item_price: value }],
-          },
-        });
-      }
     }
   }
   // responde rápido (a Velory espera 2xx em ≤10s)
