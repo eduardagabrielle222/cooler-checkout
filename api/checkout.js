@@ -5,7 +5,7 @@ import { notifyUtmify } from '../lib/utmify.js';
 import { sendCapi } from '../lib/fb.js';
 
 // Preço FIXADO no servidor — o navegador nunca decide o valor.
-const PRICE_CENTS = 7990; // R$ 79,90
+const PRICE_CENTS = 6790; // R$ 67,90
 const PRODUCT_NAME = 'Caixa Cooler Térmico Trailmate 66L Igloo Cinza';
 const CONTENT_ID = 'cooler-trailmate-66l';
 

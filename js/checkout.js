@@ -7,7 +7,7 @@
 
   var PRODUCT_NAME = 'Caixa Cooler Térmico Trailmate 66L Igloo Cinza';
   var PRODUCT_IMG = 'images/D_NQ_NP_2X_722241-MLA91596322245_092025-F.webp';
-  var PRICE_CENTS = 7990;
+  var PRICE_CENTS = 6790;
   var PRICE_OLD = 'R$ 331,90';
   var POLL_MS = 4000;
   var PIX_WINDOW_SEC = 10 * 60;

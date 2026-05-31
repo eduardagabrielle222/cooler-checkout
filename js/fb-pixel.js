@@ -11,7 +11,7 @@
     content_ids: ['cooler-trailmate-66l'],
     content_name: 'Caixa Cooler Térmico Trailmate 66L Igloo Cinza',
     content_type: 'product',
-    value: 79.90,
+    value: 67.90,
     currency: 'BRL',
   };
 

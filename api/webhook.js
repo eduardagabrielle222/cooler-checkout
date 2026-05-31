@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       const { ok, data } = await veloryFetch(`/charges/${encodeURIComponent(id)}`);
       const charge = ok && data ? data : {
         id: id, status: 'paid',
-        amount: Number(d.amountCents || d.amount || 7990),
+        amount: Number(d.amountCents || d.amount || 6790),
         customer: d.customer || {}, metadata: d.metadata || {},
         created_at: d.createdAt, paid_at: d.paidAt,
         live_mode: d.liveMode === false ? false : true,
